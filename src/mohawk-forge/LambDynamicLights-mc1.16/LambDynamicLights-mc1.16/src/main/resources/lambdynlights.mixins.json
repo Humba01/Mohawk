@@ -1,0 +1,21 @@
+{
+  "required": true,
+  "package": "me.lambdaurora.lambdynlights.mixin",
+  "plugin": "me.lambdaurora.lambdynlights.LambDynLightsMixinPlugin",
+  "compatibilityLevel": "JAVA_8",
+  "client": [
+    "ClientWorldMixin",
+    "CommonWorldRendererMixin",
+    "DebugHudMixin",
+    "EntityLighterMixin",
+    "EntityRendererMixin",
+    "MinecraftClientMixin",
+    "VideoOptionsScreenMixin",
+    "WorldMixin",
+    "ltr.LilTaterBlockEntityMixin",
+    "ltr.LilTaterBlocksMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

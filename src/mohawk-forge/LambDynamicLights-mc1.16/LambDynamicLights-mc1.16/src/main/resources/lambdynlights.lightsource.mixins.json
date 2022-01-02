@@ -1,0 +1,18 @@
+{
+  "required": true,
+  "package": "me.lambdaurora.lambdynlights.mixin.lightsource",
+  "compatibilityLevel": "JAVA_8",
+  "client": [
+    "AbstractDecorationEntityMixin",
+    "AbstractMinecartEntityMixin",
+    "BlockEntityMixin",
+    "EntityMixin",
+    "ExplosiveProjectileEntityMixin",
+    "LivingEntityMixin",
+    "PlayerEntityMixin",
+    "TntEntityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

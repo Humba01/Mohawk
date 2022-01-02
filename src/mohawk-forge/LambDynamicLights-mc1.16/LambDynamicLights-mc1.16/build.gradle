@@ -1,0 +1,170 @@
+import net.fabricmc.loom.task.RemapJarTask
+
+plugins {
+    id 'fabric-loom' version '0.5-SNAPSHOT'
+    id 'java-library'
+    id 'maven-publish'
+    id 'com.github.johnrengelman.shadow' version '5.1.0'
+    id 'net.minecrell.licenser' version '0.4.1'
+}
+
+group = project.maven_group
+version = "${project.mod_version}+${getMCVersionString()}"
+archivesBaseName = project.archives_base_name + "-fabric"
+
+def getMCVersionString() {
+    if (project.minecraft_version.matches("\\d\\dw\\d\\d[a-z]")) {
+        return project.minecraft_version
+    }
+    int lastDot = project.minecraft_version.lastIndexOf('.')
+    return project.minecraft_version.substring(0, lastDot)
+}
+
+minecraft {
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven {
+        name = "AperLambda"
+        url = 'https://aperlambda.github.io/maven'
+    }
+    maven { url = "https://jitpack.io" }
+    maven {
+        name = "grondag"
+        url = "https://grondag-repo.appspot.com"
+        credentials {
+            username "guest"
+            password ""
+        }
+    }
+    maven {
+        name = "Cotton"
+        url = "http://server.bbkr.space:8081/artifactory/libs-release/"
+    }
+}
+
+configurations {
+    shadow
+    api.extendsFrom shadow
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+    // Fabric API. This is technically optional, but you probably want it anyway.
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+    modImplementation "com.github.lambdaurora:spruceui:${project.spruceui_version}"
+    include "com.github.lambdaurora:spruceui:${project.spruceui_version}"
+
+    modImplementation("io.github.prospector:modmenu:${project.modmenu_version}") {
+        transitive = false
+    }
+    //modImplementation "grondag:canvas-mc116:1.0.+"
+    modImplementation "com.github.jellysquid3:sodium-fabric:mc1.16.3-0.1.0"
+
+    shadow "com.electronwill.night-config:core:3.6.3"
+    shadow "com.electronwill.night-config:toml:3.6.3"
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+}
+
+processResources {
+    inputs.property "version", project.version
+
+    from(sourceSets.main.resources.srcDirs) {
+        include "fabric.mod.json"
+        expand "version": project.version
+    }
+
+    from(sourceSets.main.resources.srcDirs) {
+        exclude "fabric.mod.json"
+    }
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+
+    withSourcesJar()
+}
+
+jar {
+    from "../LICENSE"
+}
+
+license {
+    header file('HEADER')
+    include '**/*.java'
+}
+
+shadowJar {
+    dependsOn(project(":").jar)
+    configurations = [project.configurations.shadow]
+    archiveClassifier.set('dev')
+
+    relocate 'com.electronwill.nightconfig', 'me.lambdaurora.lambdynlights.shadow.nightconfig'
+}
+
+task shadowRemapJar(type: RemapJarTask) {
+    dependsOn shadowJar
+
+    input = file("${project.buildDir}/libs/$archivesBaseName-$version-dev.jar")
+    archiveName = "${archivesBaseName}-${version}.jar"
+    addNestedDependencies = true
+}
+build.dependsOn(shadowRemapJar)
+
+// configure the maven publication
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifact(remapJar) {
+                builtBy remapJar
+            }
+            artifact(sourcesJar) {
+                builtBy remapSourcesJar
+            }
+
+            pom {
+                name = "LambDynamicLights"
+                description = "Adds dynamic lights to the game."
+            }
+
+            pom.withXml {
+                def dependenciesNode = asNode().appendNode('dependencies')
+
+                configurations.shadow.allDependencies.each {
+                    def dependencyNode = dependenciesNode.appendNode('dependency')
+
+                    dependencyNode.appendNode('groupId', it.group)
+                    dependencyNode.appendNode('artifactId', it.name)
+                    dependencyNode.appendNode('version', it.version)
+                    dependencyNode.appendNode('scope', 'compile')
+                }
+            }
+        }
+    }
+
+    repositories {
+        mavenLocal()
+        maven {
+            name = "BuildDirLocal"
+            url = "$buildDir/repo"
+        }
+        maven {
+            name = "GithubPackages"
+            url = uri("https://maven.pkg.github.com/LambdAurora/LambDynamicLights")
+            credentials {
+                username = project.findProperty("gpr.user") ?: System.getenv("USERNAME")
+                password = project.findProperty("gpr.key") ?: System.getenv("TOKEN")
+            }
+        }
+    }
+}

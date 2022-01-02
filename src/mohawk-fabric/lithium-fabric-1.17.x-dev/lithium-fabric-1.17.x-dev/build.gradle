@@ -1,0 +1,137 @@
+import net.fabricmc.loom.task.RemapJarTask
+
+plugins {
+    id 'fabric-loom' version '0.8-SNAPSHOT'
+    id 'maven-publish'
+}
+
+minecraft {
+    accessWidener = file("src/main/resources/lithium.accesswidener")
+    refmapName = "mixins.lithium.refmap.json"
+}
+
+apply plugin: 'fabric-loom'
+
+sourceCompatibility = JavaVersion.VERSION_16
+targetCompatibility = JavaVersion.VERSION_16
+
+group = project.maven_group
+version = project.mod_version
+archivesBaseName = "${project.name}-mc${project.minecraft_version}"
+
+def build_release = System.getenv("BUILD_RELEASE") == "true"
+def build_id = System.getenv("BUILD_ID")
+
+if (!build_release) {
+    version += "-SNAPSHOT"
+}
+
+if (build_id != null) {
+    version += "+build.${build_id}"
+}
+
+sourceSets {
+    api {
+        java {
+            compileClasspath += main.compileClasspath
+        }
+    }
+
+    main {
+        java {
+            compileClasspath += api.output
+            runtimeClasspath += api.output
+        }
+    }
+}
+
+repositories {
+    allprojects {
+        repositories {
+            maven { url 'https://jitpack.io' }
+        }
+    }
+}
+
+loom {
+    runs {
+        testmodServer {
+            runDir("testserver");
+            server()
+            ideConfigGenerated project.rootProject == project
+            source sourceSets.main
+        }
+        autoTestServer {
+            runDir("testserver");
+            inherit testmodServer
+            vmArg "-Dfabric.autoTest"
+        }
+    }
+}
+
+
+dependencies {
+    //to change the versions see the gradle.properties file
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation 'com.github.2No2Name:McTester:v0.2.3'
+    modImplementation 'com.github.astei:lazydfu:0.1.2'
+}
+
+processResources {
+    inputs.property "version", project.version
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
+}
+
+//make builds reproducible
+tasks.withType(AbstractArchiveTask) {
+    reproducibleFileOrder = true
+    preserveFileTimestamps = false
+}
+
+// ensure that the encoding is set to UTF-8, no matter what the system default is
+// this fixes some edge cases with special characters not displaying correctly
+// see http://yodaconditions.net/blog/fix-for-java-file-encoding-problems-with-gradle.html
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+}
+
+// Include the license in all JAR outputs
+tasks.withType(Jar) {
+    from "LICENSE.txt"
+    from sourceSets.api.output
+}
+
+task apiJar(type: Jar) {
+    classifier "api-dev"
+
+    from sourceSets.api.output
+}
+
+task remapApiJar(type: RemapJarTask, dependsOn: apiJar) {
+    classifier "api"
+
+    input = apiJar.archiveFile.get().asFile
+    addNestedDependencies = false
+}
+
+publishing {
+    publications {
+        main (MavenPublication) {
+            artifactId "lithium"
+            artifact(remapJar)
+        }
+
+        api (MavenPublication) {
+            artifactId "lithium-api"
+            artifact(remapApiJar)
+        }
+    }
+}
+
+build.dependsOn remapApiJar
